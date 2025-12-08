@@ -1,0 +1,24 @@
+FROM golang:1.25.3-trixie AS build
+ARG TARGETOS
+ARG TARGETARCH
+WORKDIR /workspace
+RUN --mount=type=bind,target=/workspace/go.mod,source=go.mod \
+--mount=type=bind,target=/workspace/go.sum,source=go.sum \
+--mount=type=cache,target=/root/.cache/go-build \
+--mount=type=cache,target=/go/pkg/mod \
+<<EOF
+go mod download
+EOF
+
+RUN --mount=type=bind,target=/workspace,source=. \
+--mount=type=cache,target=/root/.cache/go-build \
+--mount=type=cache,target=/go/pkg/mod \
+<<EOF
+CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /tmp/bin/app
+EOF
+
+FROM gcr.io/distroless/base-debian12:latest
+WORKDIR /app
+COPY --chown=nonroot:nonroot --chmod=100 --from=build /tmp/bin/app /app/app
+USER nonroot:nonroot
+ENTRYPOINT [ "/app/app" ]

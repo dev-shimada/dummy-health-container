@@ -1,0 +1,130 @@
+name: build
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  packages: write
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+    timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Login
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      - name: Set platform
+        id: platform
+        run: |
+          if [[ "${{ matrix.os }}" == *"-arm"* ]]; then
+            echo "platform=linux/arm64" >> $GITHUB_OUTPUT
+            echo "platform_tag=linux-arm64" >> $GITHUB_OUTPUT
+          else
+            echo "platform=linux/amd64" >> $GITHUB_OUTPUT
+            echo "platform_tag=linux-amd64" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and push
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          platforms: ${{ steps.platform.outputs.platform }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/dummy-health-container:${{ github.ref_name }}-${{ steps.platform.outputs.platform_tag }}
+          cache-from: type=gha,scope=dummy-health-container-${{ steps.platform.outputs.platform_tag }}
+          cache-to: type=gha,mode=max,scope=dummy-health-container-${{ steps.platform.outputs.platform_tag }}
+      
+  create-manifest:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push manifest
+        run: |
+          docker buildx imagetools create -t ghcr.io/${{ github.repository_owner }}/dummy-health-container:${{ github.ref_name }} \
+            -t ghcr.io/${{ github.repository_owner }}/dummy-health-container:latest \
+            ghcr.io/${{ github.repository_owner }}/dummy-health-container:${{ github.ref_name }}-linux-amd64 \
+            ghcr.io/${{ github.repository_owner }}/dummy-health-container:${{ github.ref_name }}-linux-arm64
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check if prerelease
+        id: prerelease
+        run: |
+          if [[ "${{ github.ref_name }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|rc) ]]; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate release notes
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const { data: tags } = await github.rest.repos.listTags({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+            
+            const currentTag = context.ref.replace('refs/tags/', '');
+            const currentTagIndex = tags.findIndex(tag => tag.name === currentTag);
+            const previousTag = currentTagIndex < tags.length - 1 ? tags[currentTagIndex + 1].name : null;
+            
+            let body = '';
+            if (previousTag) {
+              const { data: comparison } = await github.rest.repos.compareCommits({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                base: previousTag,
+                head: currentTag
+              });
+              
+              body = comparison.commits.map(commit => 
+                `- ${commit.commit.message.split('\n')[0]} (${commit.sha.substring(0, 7)})`
+              ).join('\n');
+            } else {
+              body = 'Initial release';
+            }
+            
+            const { data: release } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: currentTag,
+              name: currentTag,
+              body: body,
+              prerelease: ${{ steps.prerelease.outputs.prerelease }},
+              generate_release_notes: true
+            });
+            
+            console.log(`Created release: ${release.html_url}`);
