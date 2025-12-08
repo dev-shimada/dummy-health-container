@@ -1,0 +1,17 @@
+{
+    "name": "dummy-health-container",
+    "image": "ghcr.io/dev-shimada/golang-1.25.3-trixie:latest",
+    "workspaceFolder": "/workspace",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "golang.Go",
+                "GitHub.copilot"
+            ]
+        }
+    },
+    "mounts": [
+        "source=${localWorkspaceFolder}/,target=/workspace,type=bind"
+    ],
+    "remoteUser": "root"
+}
