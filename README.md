@@ -26,6 +26,87 @@
 
 ## 使用方法
 
+### Docker コンテナ（GHCR）
+
+GHCR (GitHub Container Registry) からイメージを pull して実行できます。
+
+```bash
+docker pull ghcr.io/dev-shimada/dummy-health-container:latest
+```
+
+#### 基本的な実行
+
+```bash
+docker run -p 8080:8080 ghcr.io/dev-shimada/dummy-health-container:latest
+```
+
+#### 環境変数を指定して実行
+
+```bash
+docker run -p 3000:3000 \
+  -e HEALTH_PATH=/status \
+  -e PORT=3000 \
+  ghcr.io/dev-shimada/dummy-health-container:latest
+```
+
+#### rootful
+
+```bash
+docker pull ghcr.io/dev-shimada/dummy-health-container:latest-rootful
+```
+
+```bash
+docker run -p 80:80 \
+  -e PORT=80 \
+  ghcr.io/dev-shimada/dummy-health-container:latest-rootful
+```
+
+#### タグ
+
+| タグ                                  | 説明                               |
+| ------------------------------------- | ---------------------------------- |
+| `latest`                              | 最新の安定版（non-root）           |
+| `latest-rootful`                      | 最新の安定版（root）               |
+| `v1.0.0` など                         | 特定バージョン（non-root）         |
+| `v1.0.0-rootful`                      | 特定バージョン（root）             |
+| `v1.0.0-linux-amd64`                  | amd64 アーキテクチャ向け           |
+| `v1.0.0-linux-arm64`                  | arm64 アーキテクチャ向け           |
+| `v1.0.0-rootful-linux-amd64`          | amd64 アーキテクチャ向け（root）   |
+| `v1.0.0-rootful-linux-arm64`          | arm64 アーキテクチャ向け（root）   |
+
+### ローカルで Docker ビルド
+
+```bash
+docker build -t dummy-health-container .
+```
+
+#### 実行
+
+```bash
+docker run -p 8080:8080 dummy-health-container
+```
+
+#### 環境変数を指定して実行
+
+```bash
+docker run -p 3000:3000 \
+  -e HEALTH_PATH=/status \
+  -e PORT=3000 \
+  dummy-health-container
+```
+
+#### rootful
+
+```bash
+docker build -f Dockerfile.rootful -t dummy-health-container:rootful .
+```
+
+```bash
+docker run -p 80:80 \
+  -e PORT=80 \
+  dummy-health-container:rootful
+```
+
 ### ローカル実行
 
 ```bash
