@@ -14,7 +14,7 @@
 
 ## 必要要件
 
-- Go 1.23以上
+- Go 1.27.3以上
 - Docker（DevContainer使用時）
 
 ## 環境変数

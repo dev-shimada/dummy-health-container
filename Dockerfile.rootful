@@ -1,4 +1,4 @@
-FROM golang:1.25.3-trixie AS build
+FROM golang:1.27.3-trixie AS build
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /workspace
