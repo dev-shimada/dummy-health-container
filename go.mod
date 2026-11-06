@@ -2,7 +2,7 @@ module github.com/dev-shimada/dummy-health-container
 
 go 1.27.3
 
-require github.com/labstack/echo/v4 v4.16.2
+require github.com/labstack/echo/v4 v4.16.3
 
 require (
 	github.com/labstack/gommon v0.5.0 // indirect
